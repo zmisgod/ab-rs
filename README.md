@@ -4,22 +4,22 @@ This project is aimed to learn async programing.
 
 ## useage
 
-run to test
-
 ```bash
+# simple demo
 cargo run https://static.zmis.me/web/api/test.json -n12 -c2
-```
 
-```bash
-# get 显示返回的http response body
+# get show http response body,add -debug params
 cargo run https://static.zmis.me/web/api/test.json -n1 -c1 -debug
+
 # form-data
-cargo run http://127.0.0.1:8081/v1/anniversary/public-account/date -n1 -c1 -hdopen_id=10 -hmpost
-# json
-cargo run http://127.0.0.1:8081/v1/anniversary/public-account/date -n1 -c1 -hcjson -hdopen_id=10 -hmpost
+cargo run http://127.0.0.1:8081/v1/anniversary/public-account/date -n1 -c1 -hdopen_id=10,id=2,set=3 -hmpost
+
+# json, this payload will auto transform data to json, like {"open_id":10,"id":2,"set":3}
+cargo run http://127.0.0.1:8081/v1/anniversary/public-account/date -n1 -c1 -hcjson -hdopen_id=10,id=2,set="3" -hmpost
+
 ```
 
-## help
+## command help
 
 ```bash
 `-n` 请求数
@@ -30,7 +30,7 @@ cargo run http://127.0.0.1:8081/v1/anniversary/public-account/date -n1 -c1 -hcjs
 `-debug` http的debug模式，是否显示返回的http body
 ```
 
-run to build
+## run to build
 
 ```bash
 cargo build --release
