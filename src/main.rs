@@ -9,6 +9,7 @@ async fn main() {
         let mut fetch = fetch::build_new_fetch(args[1].to_string());
         fetch::parse_line_params(args.clone(), &mut fetch);
         println!("{:?}", fetch);
-        //fetch.do_ben();
+        fetch.do_ben();
+        // fetch.do_request().await;
     }
 }
