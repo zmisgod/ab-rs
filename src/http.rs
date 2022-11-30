@@ -2,13 +2,15 @@ use reqwest::StatusCode;
 use std::error::Error;
 use std::fmt;
 use std::collections::HashMap;
+use std::time::Duration;
 
 pub struct Http {
     url: String,
     method: String,
     data: Vec<String>,
     content_type: String,
-    show_body:bool,
+    debug:bool,
+    timeout: i32,
 }
 
 impl Clone for Http {
@@ -18,7 +20,8 @@ impl Clone for Http {
             method: self.method.clone(),
             data: self.data.clone(),
             content_type: self.content_type.clone(),
-            show_body:self.show_body,
+            debug:self.debug,
+            timeout: self.timeout,
         }
     }
 }
@@ -35,33 +38,34 @@ impl fmt::Debug for Http {
         }
         write!(
             f,
-            "url:{:?} method:{:?} data:{:?} content_type:{:?} show_body:{:?}",
-            self.url, method, self.data, content_type, self.show_body
+            "url:{:?} method:{:?} data:{:?} content_type:{:?} timeout:{:?} debug:{:?}",
+            self.url, method, self.data, content_type, self.timeout, self.debug
         )
     }
 }
 
 pub fn build_new_http(url: String) -> Http {
     Http {
-        url: url,
+        url,
         method: String::from(""),
         data: vec![],
         content_type: String::from(""),
-        show_body:false
+        debug:false,
+        timeout:0,
     }
 }
 
 impl Http {
-    pub fn set_url(&mut self, url: String) {
-        self.url = url;
-    }
-
     pub fn set_content_type(&mut self, content_type: String) {
         self.content_type = content_type;
     }
 
-    pub fn set_show_body(&mut self, show:bool) {
-        self.show_body = show
+    pub fn set_timeout(&mut self, timeout: i32) {
+        self.timeout = timeout;
+    }
+
+    pub fn set_debug(&mut self, show:bool) {
+        self.debug = show
     }
 
     pub fn set_data(&mut self, data: Vec<String>) {
@@ -90,9 +94,13 @@ impl Http {
     }
 
     async fn send_get(&self) -> Result<StatusCode, Box<dyn Error>> {
-        let resp = reqwest::get(self.url.clone()).await?;
+        let mut client = reqwest::Client::builder();
+        if self.timeout > 0 {
+            client = client.timeout(Duration::from_millis(self.timeout as u64));
+        }
+        let resp = client.build()?.get(self.url.clone()).send().await?;
         let status = resp.status();
-        if self.show_body {
+        if self.debug {
             println!("{:?}", resp.text().await?);
         }
         Ok(status)
@@ -148,7 +156,11 @@ impl Http {
     }
 
     pub async fn send_post(&self) -> Result<StatusCode, Box<dyn Error>>  {
-        let client = reqwest::Client::new().post(self.url.clone());
+        let mut client = reqwest::Client::builder();
+        if self.timeout > 0 {
+            client = client.timeout(Duration::from_millis(self.timeout as u64));
+        }
+        let client = client.build()?.post(self.url.clone());
         let resp;
         if self.content_type == "json" {
             resp = client.json(&self.parse_data_to_json()).send().await?;
@@ -156,7 +168,7 @@ impl Http {
             resp = client.form(&self.parse_data_to_form()).send().await?;
         }
         let status = resp.status();
-        if self.show_body {
+        if self.debug {
             println!("{:?}", resp.text().await?);
         }
         Ok(status)
