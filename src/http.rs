@@ -1,16 +1,20 @@
 use reqwest::StatusCode;
+use reqwest::header::HeaderMap;
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
-use std::collections::HashMap;
 use std::time::Duration;
+use http::header::HeaderName;
+
 
 pub struct Http {
     url: String,
     method: String,
     data: Vec<String>,
     content_type: String,
-    debug:bool,
+    debug: bool,
     timeout: i32,
+    headers: HashMap<String, String>,
 }
 
 impl Clone for Http {
@@ -20,8 +24,9 @@ impl Clone for Http {
             method: self.method.clone(),
             data: self.data.clone(),
             content_type: self.content_type.clone(),
-            debug:self.debug,
+            debug: self.debug,
             timeout: self.timeout,
+            headers: self.headers.clone(),
         }
     }
 }
@@ -38,8 +43,10 @@ impl fmt::Debug for Http {
         }
         write!(
             f,
-            "url:{:?} method:{:?} data:{:?} content_type:{:?} timeout:{:?} debug:{:?}",
-            self.url, method, self.data, content_type, self.timeout, self.debug
+            "url:{:?} method:{:?} data:{:?} content_type:{:?} headers:{:?}
+            timeout:{:?} debug:{:?}",
+            self.url, method, self.data, content_type, self.headers,
+            self.timeout, self.debug
         )
     }
 }
@@ -50,12 +57,19 @@ pub fn build_new_http(url: String) -> Http {
         method: String::from(""),
         data: vec![],
         content_type: String::from(""),
-        debug:false,
-        timeout:0,
+        debug: false,
+        timeout: 0,
+        headers: HashMap::new(),
     }
 }
 
 impl Http {
+    pub fn set_headers(&mut self, headers:Vec<(String, String)>) {
+        for (key, value) in headers.iter() {
+            self.headers.insert(key.to_string(), value.to_string());
+        }
+    }
+
     pub fn set_content_type(&mut self, content_type: String) {
         self.content_type = content_type;
     }
@@ -64,7 +78,7 @@ impl Http {
         self.timeout = timeout;
     }
 
-    pub fn set_debug(&mut self, show:bool) {
+    pub fn set_debug(&mut self, show: bool) {
         self.debug = show
     }
 
@@ -88,17 +102,13 @@ impl Http {
         self.check_data();
         if self.method == "post" {
             return self.send_post().await;
-        }else{
+        } else {
             return self.send_get().await;
         }
     }
 
     async fn send_get(&self) -> Result<StatusCode, Box<dyn Error>> {
-        let mut client = reqwest::Client::builder();
-        if self.timeout > 0 {
-            client = client.timeout(Duration::from_millis(self.timeout as u64));
-        }
-        let resp = client.build()?.get(self.url.clone()).send().await?;
+        let resp = self.builder_client()?.get(self.url.clone()).send().await?;
         let status = resp.status();
         if self.debug {
             println!("{:?}", resp.text().await?);
@@ -109,7 +119,7 @@ impl Http {
     fn parse_data_to_form(&self) -> Vec<(String, String)> {
         let mut data_vec = vec![];
         for (_, val) in self.data.iter().enumerate() {
-            let mut one:(String, String) = (String::from(""), String::from(""));
+            let mut one: (String, String) = (String::from(""), String::from(""));
             let exp: Vec<&str> = val.split("=").collect();
             if exp.len() > 1 {
                 match exp.get(0) {
@@ -134,7 +144,7 @@ impl Http {
         let mut hash_vec = HashMap::new();
         for (_, val) in self.data.iter().enumerate() {
             let exp: Vec<&str> = val.split("=").collect();
-            let mut k =String::from("");
+            let mut k = String::from("");
             let mut v = String::from("");
             if exp.len() > 1 {
                 match exp.get(0) {
@@ -155,18 +165,35 @@ impl Http {
         hash_vec
     }
 
-    pub async fn send_post(&self) -> Result<StatusCode, Box<dyn Error>>  {
+    pub fn builder_client(&self) -> reqwest::Result<reqwest::Client> {
         let mut client = reqwest::Client::builder();
         if self.timeout > 0 {
-            client = client.timeout(Duration::from_millis(self.timeout as u64));
+            client = client.timeout(Duration::from_millis(self.timeout as u64))
         }
-        let client = client.build()?.post(self.url.clone());
-        let resp;
+        if self.headers.len() > 0 {
+            let mut header_map = HeaderMap::new();
+            for (key, value) in self.headers.iter() {
+                header_map.insert(HeaderName::from_lowercase(key.as_bytes()).unwrap(), value.parse().unwrap());
+            }
+            client = client.default_headers(header_map);
+        }
+        client.build()
+    }
+
+    pub async fn get_response(
+        &self,
+        client: reqwest::RequestBuilder,
+    ) -> reqwest::Result<reqwest::Response> {
         if self.content_type == "json" {
-            resp = client.json(&self.parse_data_to_json()).send().await?;
-        }else{
-            resp = client.form(&self.parse_data_to_form()).send().await?;
+            return client.json(&self.parse_data_to_json()).send().await;
+        } else {
+            return client.form(&self.parse_data_to_form()).send().await;
         }
+    }
+
+    pub async fn send_post(&self) -> Result<StatusCode, Box<dyn Error>> {
+        let client = self.builder_client()?.post(self.url.clone());
+        let resp = self.get_response(client).await?;
         let status = resp.status();
         if self.debug {
             println!("{:?}", resp.text().await?);
