@@ -6,13 +6,16 @@ use std::error::Error;
 #[command(name = "ab-rs")]
 #[command(author, version, about="a benchmark by rust", long_about = None, )]
 pub struct Args {
-    // Seconds to max. wait for each response(millseconds)
+    // Seconds to max. wait for each response(milliseconds)
     #[arg(short = 't', default_value_t = 3000)]
     http_timeout: i32,
 
     // Number of requests to perform
     #[arg(short = 'n', default_value_t = 1)]
     request_num: i32,
+
+    #[arg(short = 'c', default_value_t = String::from("form-data"))]
+    http_content_type: String,
 
     // http post data
     #[arg(short='d', default_value_t = String::from(""))]
@@ -41,7 +44,7 @@ where
 {
     let pos = s
         .find("=")
-        .ok_or_else(|| format!("invald key=value: no `=` found in `{}`", s))?;
+        .ok_or_else(|| format!("invalid key=value: no `=` found in `{}`", s))?;
     Ok((s[..pos].parse()?, s[pos + 1..].parse()?))
 }
 
@@ -51,7 +54,7 @@ pub async fn run() {
     fetch.n = args.request_num;
     fetch.http.set_method(args.http_method.to_string());
     fetch.http.set_data(Vec::new());
-    fetch.http.set_content_type(String::from(""));
+    fetch.http.set_content_type(args.http_content_type);
     fetch.http.set_debug(args.debug);
     fetch.http.set_timeout(args.http_timeout);
     fetch.http.set_headers(args.http_header);

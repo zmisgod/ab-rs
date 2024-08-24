@@ -71,7 +71,11 @@ impl Http {
     }
 
     pub fn set_content_type(&mut self, content_type: String) {
-        self.content_type = content_type;
+        if content_type == "" {
+            self.content_type = String::from("form-data");
+        }else{
+            self.content_type = content_type;
+        }
     }
 
     pub fn set_timeout(&mut self, timeout: i32) {
